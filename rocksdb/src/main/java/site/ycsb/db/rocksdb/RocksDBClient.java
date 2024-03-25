@@ -47,9 +47,11 @@ public class RocksDBClient extends DB {
   static final String PROPERTY_ROCKSDB_DIR = "rocksdb.dir";
   static final String PROPERTY_ROCKSDB_OPTIONS_FILE = "rocksdb.optionsfile";
   private static final String COLUMN_FAMILY_NAMES_FILENAME = "CF_NAMES";
-  static final double AUTUMNC = 0.4;
-  static final double MAXBYTES = 5;
-  static final long SLEEP = 0; 
+  static final String PROPERTY_AUTUMNC = "c";
+  static final String PROPERTY_MAXBYTES = "T";
+  // static double AUTUMNC = -1;
+  // static double MAXBYTES = 5;
+  static final long SLEEP = 30000; 
   // 24000000 micros = 400 minutes (end of load), 
   // 1800000 micros = 30 minutes (between workloads)
 
@@ -144,11 +146,24 @@ public class RocksDBClient extends DB {
     final List<ColumnFamilyOptions> cfOptionss = new ArrayList<>();
     final List<ColumnFamilyDescriptor> cfDescriptors = new ArrayList<>();
 
+    String maxBytesStr = getProperties().getProperty(PROPERTY_MAXBYTES);
+    double maxBytes = 5;
+    if (maxBytesStr != null) {
+      maxBytes = Double.parseDouble(maxBytesStr);
+    }
+    System.out.println("Setting max_bytes_for_level_multiplier = " + maxBytes);
+
+    String autumnCStr = getProperties().getProperty(PROPERTY_AUTUMNC);
+    if (autumnCStr != null) {
+      double autumnC = Double.parseDouble(autumnCStr);
+      System.out.println("Setting Autumn C = " + autumnC);
+    }
+
     for(final String cfName : cfNames) {
       final ColumnFamilyOptions cfOptions = new ColumnFamilyOptions()
           .optimizeLevelStyleCompaction()
-          .setMaxBytesForLevelMultiplier(MAXBYTES);
-          // .setAutumnC(AUTUMNC);
+          .setMaxBytesForLevelMultiplier(maxBytes);
+          // .setAutumnC(autumnC);
       final ColumnFamilyDescriptor cfDescriptor = new ColumnFamilyDescriptor(
           cfName.getBytes(UTF_8),
           cfOptions
@@ -167,15 +182,12 @@ public class RocksDBClient extends DB {
           .setIncreaseParallelism(rocksThreads)
           .setMaxBackgroundCompactions(rocksThreads)
           .setInfoLogLevel(InfoLogLevel.INFO_LEVEL)
-          .setMaxBytesForLevelMultiplier(MAXBYTES);
-          // .setAutumnC(AUTUMNC);
+          .setMaxBytesForLevelMultiplier(maxBytes);
+          // .setAutumnC(autumnC);
       statistics = new Statistics();
       statistics.setStatsLevel(StatsLevel.ALL);
       options.setStatistics(statistics);
       dbOptions = options;
-
-      System.out.println("Autumn C set to " + AUTUMNC);
-      System.out.println("Multiplier set to " + MAXBYTES);
 
       return RocksDB.open(options, rocksDbDir.toAbsolutePath().toString());
     } else {
@@ -207,16 +219,29 @@ public class RocksDBClient extends DB {
     synchronized (RocksDBClient.class) {
       try {
         if (references == 1) {
-          for (final ColumnFamily cf : COLUMN_FAMILIES.values()) {
-            cf.getHandle().close();
+          long start = System.currentTimeMillis();
+          try {
+            // sleep for a bit, just to allow background threads to wake up 
+            Thread.sleep(SLEEP);
+          } catch (Exception e) {
+            e.printStackTrace();
           }
 
+          // Wait for compactions to finish 
+          System.err.println("Waiting for background work");
+          rocksDb.waitForBackgroundWork();
+          System.err.println("Finished waiting for background work");
+          long end = System.currentTimeMillis();
+          System.out.println("[OVERALL], Compaction time(ms): " + (end - start));
+
           try {
-            Thread.sleep(SLEEP);
-            // System.err.println(rocksDb.getProperty("rocksdb.stats"));
             System.err.println(statistics.toString());
           } catch (Exception e) {
             e.printStackTrace();
+          }
+
+          for (final ColumnFamily cf : COLUMN_FAMILIES.values()) {
+            cf.getHandle().close();
           }
 
           rocksDb.close();
@@ -456,6 +481,20 @@ public class RocksDBClient extends DB {
   private void createColumnFamily(final String name) throws RocksDBException {
     COLUMN_FAMILY_LOCKS.putIfAbsent(name, new ReentrantLock());
 
+    String maxBytesStr = getProperties().getProperty(PROPERTY_MAXBYTES);
+    double maxBytes = 5;
+    if (maxBytesStr != null) {
+      maxBytes = Double.parseDouble(maxBytesStr);
+    }
+    System.out.println("Setting max_bytes_for_level_multiplier = " + maxBytes);
+
+    String autumnCStr = getProperties().getProperty(PROPERTY_AUTUMNC);
+    double autumnC = 0.8;
+    if (autumnCStr != null) {
+      autumnC = Double.parseDouble(autumnCStr);
+    }
+    System.out.println("Setting Autumn C = " + autumnC);
+
     final Lock l = COLUMN_FAMILY_LOCKS.get(name);
     l.lock();
     try {
@@ -469,8 +508,8 @@ public class RocksDBClient extends DB {
         } else {
           cfOptions = new ColumnFamilyOptions()
                   .optimizeLevelStyleCompaction()
-                  .setMaxBytesForLevelMultiplier(MAXBYTES);
-                  // .setAutumnC(AUTUMNC);
+                  .setMaxBytesForLevelMultiplier(maxBytes);
+                  // .setAutumnC(autumnC);
         }
 
         final ColumnFamilyHandle cfHandle = rocksDb.createColumnFamily(
