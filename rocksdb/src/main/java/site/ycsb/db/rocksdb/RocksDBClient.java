@@ -55,6 +55,15 @@ public class RocksDBClient extends DB {
   // 24000000 micros = 400 minutes (end of load), 
   // 1800000 micros = 30 minutes (between workloads)
 
+  static final long BLOCKCACHESIZE = 32 * 1024 * 1024;
+  static final boolean ENABLEINDEXCOMPRESSION = false;
+  static final boolean NOBLOCKCACHE = false;
+  static final int READAMPBYTESPERBIT = 1;
+  static final boolean CACHEINDEXANDFILTERBLOCKS = true;
+  static final CompressionType COMPRESSIONTYPE = CompressionType.NO_COMPRESSION;
+  static final boolean USEDIRECTREADS = true;
+  static final boolean USEDIRECTIOFORFLUSHANDCOMPACTION = true;
+
   private static Statistics statistics = null;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RocksDBClient.class);
@@ -162,12 +171,15 @@ public class RocksDBClient extends DB {
 
     for(final String cfName : cfNames) {
       BlockBasedTableConfig tableOptions = new BlockBasedTableConfig()
-                  .setEnableIndexCompression(false)
-                  .setNoBlockCache(false);
+                  .setEnableIndexCompression(ENABLEINDEXCOMPRESSION)
+                  .setBlockCacheSize(BLOCKCACHESIZE)
+                  .setCacheIndexAndFilterBlocks(CACHEINDEXANDFILTERBLOCKS)
+                  .setReadAmpBytesPerBit(READAMPBYTESPERBIT)
+                  .setNoBlockCache(NOBLOCKCACHE);
       final ColumnFamilyOptions cfOptions = new ColumnFamilyOptions()
           .optimizeLevelStyleCompaction()
           .setMaxBytesForLevelMultiplier(maxBytes)
-          .setCompressionType(CompressionType.NO_COMPRESSION)
+          .setCompressionType(COMPRESSIONTYPE)
           .setLevelCompactionDynamicLevelBytes(false)
           .setTableFormatConfig(tableOptions);
           // .setAutumnC(autumnC);
@@ -183,8 +195,11 @@ public class RocksDBClient extends DB {
 
     if(cfDescriptors.isEmpty()) {
       BlockBasedTableConfig tableOptions = new BlockBasedTableConfig()
-                  .setEnableIndexCompression(false)
-                  .setNoBlockCache(false);
+                  .setEnableIndexCompression(ENABLEINDEXCOMPRESSION)
+                  .setBlockCacheSize(BLOCKCACHESIZE)
+                  .setCacheIndexAndFilterBlocks(CACHEINDEXANDFILTERBLOCKS)
+                  .setReadAmpBytesPerBit(READAMPBYTESPERBIT)
+                  .setNoBlockCache(NOBLOCKCACHE);
       final Options options = new Options()
           .optimizeLevelStyleCompaction()
           .setCreateIfMissing(true)
@@ -193,11 +208,11 @@ public class RocksDBClient extends DB {
           .setMaxBackgroundCompactions(rocksThreads)
           .setInfoLogLevel(InfoLogLevel.INFO_LEVEL)
           .setMaxBytesForLevelMultiplier(maxBytes)
-          .setCompressionType(CompressionType.NO_COMPRESSION)
+          .setCompressionType(COMPRESSIONTYPE)
           .setLevelCompactionDynamicLevelBytes(false)
           .setTableFormatConfig(tableOptions)
-          .setUseDirectReads(true)
-          .setUseDirectIoForFlushAndCompaction(true);
+          .setUseDirectReads(USEDIRECTREADS)
+          .setUseDirectIoForFlushAndCompaction(USEDIRECTIOFORFLUSHANDCOMPACTION);
           // .setAutumnC(autumnC);
       statistics = new Statistics();
       statistics.setStatsLevel(StatsLevel.ALL);
@@ -527,12 +542,15 @@ public class RocksDBClient extends DB {
           cfOptions = getDefaultColumnFamilyOptions(name);
         } else {
           BlockBasedTableConfig tableOptions = new BlockBasedTableConfig()
-                  .setEnableIndexCompression(false)
-                  .setNoBlockCache(false);
+                  .setEnableIndexCompression(ENABLEINDEXCOMPRESSION)
+                  .setBlockCacheSize(BLOCKCACHESIZE)
+                  .setCacheIndexAndFilterBlocks(CACHEINDEXANDFILTERBLOCKS)
+                  .setReadAmpBytesPerBit(READAMPBYTESPERBIT)
+                  .setNoBlockCache(NOBLOCKCACHE);
           cfOptions = new ColumnFamilyOptions()
                   .optimizeLevelStyleCompaction()
                   .setMaxBytesForLevelMultiplier(maxBytes)
-                  .setCompressionType(CompressionType.NO_COMPRESSION)
+                  .setCompressionType(COMPRESSIONTYPE)
                   .setLevelCompactionDynamicLevelBytes(false)
                   .setTableFormatConfig(tableOptions);
                   // .setAutumnC(autumnC);
